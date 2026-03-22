@@ -67,8 +67,8 @@ def get_groups(
     current_user: dict = Depends(get_current_user)
 ):
     """获取群组列表"""
-    result = GroupService.get_groups(current_user["user_id"])
-    return GroupListResponse(**result)
+    result = GroupService.get_user_groups(current_user["user_id"])
+    return GroupListResponse(total=len(result), groups=result)
 
 
 @router.get("/{group_id}", response_model=GroupResponse)
@@ -77,7 +77,8 @@ def get_group(
     current_user: dict = Depends(get_current_user)
 ):
     """获取群组详情"""
-    group = GroupService.get_group(group_id, current_user["user_id"])
+    groups = GroupService.get_user_groups(current_user["user_id"])
+    group = next((g for g in groups if g["id"] == group_id), None)
     if not group:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
