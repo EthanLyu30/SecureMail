@@ -2,7 +2,7 @@
 邮件相关API - 支持跨域邮件
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
@@ -354,6 +354,53 @@ def get_mail_keywords(
             detail="邮件不存在"
         )
     return {"keywords": mail.get("keywords", [])}
+
+
+@router.post("/attachment")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """上传附件"""
+    import os
+    import hashlib
+    from app.core.config import settings
+
+    # 读取文件内容
+    content = await file.read()
+
+    # 检查文件大小 (最大10MB)
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="文件大小不能超过10MB"
+        )
+
+    # 计算文件哈希用于去重
+    file_hash = hashlib.sha256(content).hexdigest()
+
+    # 确保目录存在
+    os.makedirs(settings.ATTACHMENT_DIR, exist_ok=True)
+
+    # 检查是否已存在相同文件（去重）
+    hash_dir = os.path.join(settings.ATTACHMENT_DIR, file_hash[:2])
+    os.makedirs(hash_dir, exist_ok=True)
+
+    # 保存文件
+    file_ext = os.path.splitext(file.filename)[1] if file.filename else ""
+    file_path = os.path.join(hash_dir, f"{file_hash}{file_ext}")
+
+    if not os.path.exists(file_path):
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+    # 返回附件信息
+    return {
+        "id": f"{file_hash[:2]}/{file_hash}{file_ext}",
+        "filename": file.filename or "unknown",
+        "size": len(content),
+        "hash": file_hash
+    }
 
 
 @router.post("/attachment/download/{file_id}")

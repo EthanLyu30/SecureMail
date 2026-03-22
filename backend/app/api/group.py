@@ -1,7 +1,7 @@
 """
 群组相关API
 """
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 
@@ -26,14 +26,20 @@ class UpdateGroupRequest(BaseModel):
     members: List[str] = []
 
 
+class GroupMemberInfo(BaseModel):
+    """群组成员信息"""
+    id: int
+    username: str
+    email: str
+
+
 class GroupResponse(BaseModel):
     """群组响应"""
     id: int
     name: str
-    description: str
-    owner_id: int
-    members: str
-    created_at: str
+    description: Optional[str] = ""
+    role: str = "member"
+    members: List[GroupMemberInfo] = []
 
 
 class GroupListResponse(BaseModel):
@@ -48,17 +54,16 @@ def create_group(
     current_user: dict = Depends(get_current_user)
 ):
     """创建群组"""
-    result = GroupService.create_group(
-        owner_id=current_user["user_id"],
+    success, message, group_id = GroupService.create_group(
         name=req.name,
-        description=req.description,
-        members=req.members
+        owner_id=current_user["user_id"],
+        domain_id=current_user.get("domain_id", 1)
     )
-    if result["success"]:
-        return result
+    if success:
+        return {"success": True, "message": message, "group_id": group_id}
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=result.get("message", "创建失败")
+        detail=message
     )
 
 
@@ -94,18 +99,17 @@ def update_group(
     current_user: dict = Depends(get_current_user)
 ):
     """更新群组"""
-    result = GroupService.update_group(
+    success, message = GroupService.update_group(
         group_id=group_id,
         owner_id=current_user["user_id"],
         name=req.name,
-        description=req.description,
-        members=req.members
+        description=req.description
     )
-    if result["success"]:
-        return result
+    if success:
+        return {"success": True, "message": message}
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=result.get("message", "更新失败")
+        detail=message
     )
 
 
@@ -115,10 +119,10 @@ def delete_group(
     current_user: dict = Depends(get_current_user)
 ):
     """删除群组"""
-    result = GroupService.delete_group(group_id, current_user["user_id"])
-    if result["success"]:
-        return result
+    success, message = GroupService.delete_group(group_id, current_user["user_id"])
+    if success:
+        return {"success": True, "message": message}
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=result.get("message", "删除失败")
+        detail=message
     )

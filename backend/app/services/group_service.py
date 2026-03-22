@@ -62,7 +62,7 @@ class GroupService:
                     groups.append({
                         "id": group.id,
                         "name": group.name,
-                        "description": group.description,
+                        "description": group.description or "",
                         "role": m.role,
                         "members": members_data
                     })
@@ -142,5 +142,49 @@ class GroupService:
             db.delete(member)
             db.commit()
             return True, "成员已移除"
+        finally:
+            db.close()
+
+    @staticmethod
+    def update_group(group_id: int, owner_id: int, name: str = "", description: str = "") -> Tuple[bool, str]:
+        """更新群组"""
+        db = SessionLocal()
+        try:
+            group = db.query(Group).filter(Group.id == group_id).first()
+            if not group:
+                return False, "群组不存在"
+
+            if group.owner_id != owner_id:
+                return False, "只有群主可以更新群组"
+
+            if name:
+                group.name = name
+            if description:
+                group.description = description
+
+            db.commit()
+            return True, "群组已更新"
+        finally:
+            db.close()
+
+    @staticmethod
+    def delete_group(group_id: int, owner_id: int) -> Tuple[bool, str]:
+        """删除群组"""
+        db = SessionLocal()
+        try:
+            group = db.query(Group).filter(Group.id == group_id).first()
+            if not group:
+                return False, "群组不存在"
+
+            if group.owner_id != owner_id:
+                return False, "只有群主可以删除群组"
+
+            # 删除所有成员
+            db.query(GroupMember).filter(GroupMember.group_id == group_id).delete()
+            # 删除群组
+            db.delete(group)
+            db.commit()
+
+            return True, "群组已删除"
         finally:
             db.close()
